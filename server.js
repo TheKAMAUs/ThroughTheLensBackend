@@ -1,11 +1,11 @@
-
-// config.js
-import { MPESA_CONFIG } from "./config.js";
-
 const express = require("express");
-const fs = require("fs"); // Import fs
-const app = express();
+const fs = require("fs");
+const axios = require("axios");
+const moment = require("moment");
 const admin = require("firebase-admin");
+require("dotenv").config();
+
+const { MPESA_CONFIG } = require("./config.js");
 
 
 

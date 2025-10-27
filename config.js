@@ -1,9 +1,7 @@
 // config.js
-import dotenv from "dotenv";
+require("dotenv").config();
 
-dotenv.config();
-
-export const MPESA_CONFIG = {
+const MPESA_CONFIG = {
     consumerKey: process.env.CONSUMER_KEY,
     consumerSecret: process.env.CONSUMER_SECRET,
     shortCode: process.env.SHORT_CODE,
@@ -11,3 +9,4 @@ export const MPESA_CONFIG = {
     callbackUrl: process.env.CALLBACK_URL,
 };
 
+module.exports = { MPESA_CONFIG };
