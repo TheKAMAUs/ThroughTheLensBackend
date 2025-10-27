@@ -9,22 +9,20 @@ const { MPESA_CONFIG } = require("./config.js");
 
 
 
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+// ✅ Create the Express app FIRST
+const app = express();
 
-
-
-
-// Middleware to parse JSON
+// ✅ Middleware
 app.use(express.json());
 
-
-
+// ✅ Firebase setup
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
 });
 
-const db = admin.firestore(); // Firestore reference
+const db = admin.firestore();
 
 
 
