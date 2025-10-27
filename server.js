@@ -1,7 +1,13 @@
+
+// config.js
+import { MPESA_CONFIG } from "./config.js";
+
 const express = require("express");
 const fs = require("fs"); // Import fs
 const app = express();
 const admin = require("firebase-admin");
+
+
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 
@@ -25,12 +31,96 @@ const db = admin.firestore(); // Firestore reference
 
 // Simple test route
 app.get("/", (req, res) => {
-    res.send("🚀 M-Pesa Server is Live on Render!");
+    res.send("MPESA DARAJA API WITH NODE JS BY Hews SOFTWARES");
+    var timeStamp = moment().format("YYYYMMDDHHmmss");
+    console.log(timeStamp);
 });
 
 
+
+
+
+
+async function getAccessToken() {
+    const consumer_key = MPESA_CONFIG.consumerKey; // REPLACE IT WITH YOUR CONSUMER KEY
+    const consumer_secret = MPESA_CONFIG.consumerSecret; // REPLACE IT WITH YOUR CONSUMER SECRET
+    const url =
+        "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
+    const auth =
+        "Basic " +
+        new Buffer.from(consumer_key + ":" + consumer_secret).toString("base64");
+
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                Authorization: auth,
+            },
+        });
+
+        const dataresponse = response.data;
+        // console.log(data);
+        const accessToken = dataresponse.access_token;
+        return accessToken;
+    } catch (error) {
+        throw error;
+    }
+}
+
+
+
+// STK Push endpoint
+app.post("/stkpush", async (req, res) => {
+    try {
+        const { phoneNumber, amount, accountNumber } = req.body;
+        console.log("📞 Received:", { phoneNumber, amount, accountNumber });
+
+        const accessToken = await getAccessToken();
+
+        const auth = "Bearer " + accessToken;
+        const timestamp = moment().format("YYYYMMDDHHmmss");
+        const password = Buffer.from(`${MPESA_CONFIG.shortCode}${MPESA_CONFIG.passkey}${timestamp}`).toString("base64");
+
+        const response = await axios.post(
+            "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+            {
+                BusinessShortCode: MPESA_CONFIG.shortCode,
+                Password: password,
+                Timestamp: timestamp,
+                TransactionType: "CustomerPayBillOnline",
+                Amount: amount,
+                PartyA: phoneNumber,
+                PartyB: MPESA_CONFIG.shortCode,
+                PhoneNumber: phoneNumber,
+                CallBackURL: MPESA_CONFIG.callbackUrl,
+                AccountReference: accountNumber,
+                TransactionDesc: "Mpesa Daraja API stk push test",
+            },
+            { headers: { Authorization: auth } }
+        );
+
+        res.json({
+            status: true,
+            message:
+                "😀 STK Push initiated successfully. Please enter your M-Pesa PIN.",
+            response: response.data,
+        });
+    } catch (error) {
+        console.error("❌ STK Push failed:", error.response?.data || error.message);
+        res.status(500).json({
+            status: false,
+            message: "❌ STK Push request failed",
+            error: error.response?.data || error.message,
+        });
+    }
+});
+
+
+
+
+
+
 // STK Push Callback route
-app.post("/api/callback", async (req, res) => {
+app.post("/callback", async (req, res) => {
     try {
         console.log("✅ STK PUSH CALLBACK RECEIVED!");
 
@@ -76,6 +166,8 @@ app.post("/api/callback", async (req, res) => {
         res.status(500).json({ error: error.toString() });
     }
 });
+
+
 
 
 // Start server
