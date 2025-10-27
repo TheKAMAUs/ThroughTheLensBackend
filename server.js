@@ -4,14 +4,15 @@ const axios = require("axios");
 const moment = require("moment");
 const admin = require("firebase-admin");
 require("dotenv").config();
-
+const cors = require("cors");
 const { MPESA_CONFIG } = require("./config.js");
 
 
 
 // ✅ Create the Express app FIRST
 const app = express();
-
+// ✅ Enable CORS for all requests
+app.use(cors());
 // ✅ Middleware
 app.use(express.json());
 
