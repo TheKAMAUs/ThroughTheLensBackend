@@ -100,7 +100,7 @@ app.post("/stkpush", async (req, res) => {
         res.json({
             status: true,
             message:
-                "😀 STK Push initiated successfully. Please enter your M-Pesa PIN.",
+                "😀 Request successful ✔✔. Please enter your M-Pesa PIN.",
             response: response.data,
         });
     } catch (error) {
