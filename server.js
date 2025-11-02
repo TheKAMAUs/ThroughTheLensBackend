@@ -192,33 +192,52 @@ app.get("/save_path.php", (req, res) => {
     res.json({ status: "added", path: visitedPath });
 });
 
-// Endpoint: generate sitemap (replaces sitemap.php)
-app.get("/sitemap.php", (req, res) => {
+/// Endpoint: generate sitemap (replaces sitemap.php)
+app.get(["/sitemap.php", "/sitemap.xml"], (req, res) => {
     try {
         if (!fs.existsSync(logFile)) {
-            return res.status(404).json({ error: "No visited paths found" });
+            return res
+                .status(404)
+                .json({ error: "No visited paths found. Log file missing." });
         }
 
-        const lines = fs.readFileSync(logFile, "utf8").trim().split("\n");
-        const urls = [...new Set(lines.map(line => line.split(",")[0]))];
+        // Read and clean up logged URLs
+        const lines = fs
+            .readFileSync(logFile, "utf8")
+            .trim()
+            .split("\n")
+            .filter(Boolean);
 
+        // Extract unique paths only
+        const urls = [...new Set(lines.map((line) => line.split(",")[0].trim()))];
+
+        // Generate XML content
         const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>\n` +
             `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-            urls.map(
-                u => `  <url>\n    <loc>https://throughthelens.pages.dev${u}</loc>\n  </url>`
-            ).join("\n") +
+            urls
+                .map(
+                    (u) => `
+  <url>
+    <loc>https://throughthelens.pages.dev${u}</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`
+                )
+                .join("\n") +
             `\n</urlset>`;
 
+        // Save it to sitemap.xml
         fs.writeFileSync(sitemapFile, sitemapContent, "utf8");
-        console.log("🗺️  Sitemap updated.");
+        console.log("🗺️ Sitemap successfully updated with", urls.length, "URLs.");
 
+        // Respond to browser or crawler
         res.type("application/xml").send(sitemapContent);
     } catch (err) {
         console.error("❌ Sitemap generation failed:", err);
         res.status(500).json({ error: "Failed to generate sitemap" });
     }
 });
-
 
 
 
