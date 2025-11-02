@@ -169,6 +169,61 @@ app.post("/callback", async (req, res) => {
 
 
 
+const logFile = path.join(process.cwd(), "visited_paths.csv");
+const sitemapFile = path.join(process.cwd(), "sitemap.xml");
+
+// Helper: add a new path
+function addPath(pathStr) {
+    const date = new Date().toISOString().split("T")[0];
+    const line = `${pathStr},${date}\n`;
+    fs.appendFileSync(logFile, line, "utf8");
+    console.log(`✅ Logged path: ${pathStr}`);
+}
+
+// Endpoint: save path (replaces save_path.php)
+app.get("/save_path.php", (req, res) => {
+    const visitedPath = req.query.path;
+    if (!visitedPath) {
+        return res.status(400).json({ error: "Missing path" });
+    }
+
+    addPath(visitedPath);
+    res.json({ status: "added", path: visitedPath });
+});
+
+// Endpoint: generate sitemap (replaces sitemap.php)
+app.get("/sitemap.php", (req, res) => {
+    try {
+        if (!fs.existsSync(logFile)) {
+            return res.status(404).json({ error: "No visited paths found" });
+        }
+
+        const lines = fs.readFileSync(logFile, "utf8").trim().split("\n");
+        const urls = [...new Set(lines.map(line => line.split(",")[0]))];
+
+        const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+            `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+            urls.map(
+                u => `  <url>\n    <loc>https://throughthelens.pages.dev${u}</loc>\n  </url>`
+            ).join("\n") +
+            `\n</urlset>`;
+
+        fs.writeFileSync(sitemapFile, sitemapContent, "utf8");
+        console.log("🗺️  Sitemap updated.");
+
+        res.type("application/xml").send(sitemapContent);
+    } catch (err) {
+        console.error("❌ Sitemap generation failed:", err);
+        res.status(500).json({ error: "Failed to generate sitemap" });
+    }
+});
+
+
+
+
+
+
+
 // Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
