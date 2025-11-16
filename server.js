@@ -39,8 +39,6 @@ app.get("/", (req, res) => {
 
 
 
-
-
 async function getAccessToken() {
     const consumer_key = MPESA_CONFIG.consumerKey; // REPLACE IT WITH YOUR CONSUMER KEY
     const consumer_secret = MPESA_CONFIG.consumerSecret; // REPLACE IT WITH YOUR CONSUMER SECRET
@@ -116,9 +114,6 @@ app.post("/stkpush", async (req, res) => {
 
 
 
-
-
-
 // STK Push Callback route
 app.post("/callback", async (req, res) => {
     try {
@@ -166,6 +161,149 @@ app.post("/callback", async (req, res) => {
         res.status(500).json({ error: error.toString() });
     }
 });
+
+
+
+
+// B2C WITHDRAWAL ROUTE
+app.post("/b2curlrequest", (req, res) => {
+    const { phoneNumber, amount } = req.body;
+
+    if (!phoneNumber || !amount) {
+        return res.status(400).json({
+            error: "Phone number and amount are required",
+        });
+    }
+
+    getAccessToken()
+        .then((accessToken) => {
+            const securityCredential =
+                "N3Lx/hisedzPLxhDMDx80IcioaSO7eaFuMC52Uts4ixvQ/Fhg5LFVWJ3FhamKur/bmbFDHiUJ2KwqVeOlSClDK4nCbRIfrqJ+jQZsWqrXcMd0o3B2ehRIBxExNL9rqouKUKuYyKtTEEKggWPgg81oPhxQ8qTSDMROLoDhiVCKR6y77lnHZ0NU83KRU4xNPy0hRcGsITxzRWPz3Ag+qu/j7SVQ0s3FM5KqHdN2UnqJjX7c0rHhGZGsNuqqQFnoHrshp34ac/u/bWmrApUwL3sdP7rOrb0nWasP7wRSCP6mAmWAJ43qWeeocqrz68TlPDIlkPYAT5d9QlHJbHHKsa1NA==";
+
+            const url = "https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest";
+
+            axios
+                .post(
+                    url,
+                    {
+                        InitiatorName: "testapi",
+                        SecurityCredential: securityCredential,
+                        CommandID: "PromotionPayment",
+                        Amount: amount,
+                        PartyA: "600996", // Your shortcode
+                        PartyB: phoneNumber, // Recipient (user)
+                        Remarks: "Withdrawal",
+                        QueueTimeOutURL: "https://yourdomain.com/b2c/queue",
+                        ResultURL: "https://throughthelensbackend.onrender.com/b2c/result",
+                        Occasion: "Auto Withdrawal",
+                    },
+                    {
+                        headers: {
+                            Authorization: "Bearer " + accessToken,
+                        },
+                    }
+                )
+                .then((response) => {
+                    res.status(200).json({
+                        status: true,
+                        message: "Withdrawal request sent successfully",
+                        mpesa: response.data,
+                    });
+                })
+                .catch((error) => {
+                    console.error(error);
+                    res.status(500).json({
+                        status: false,
+                        message: "❌ B2C Request failed",
+                        error: error.response?.data || error.message,
+                    });
+                });
+        })
+        .catch((err) => {
+            console.error(err);
+            res.status(500).json({
+                status: false,
+                message: "❌ Failed to get access token",
+            });
+        });
+});
+
+
+
+// B2C Result Callback Route
+app.post("/b2c/result", async (req, res) => {
+    try {
+        console.log("✅ B2C RESULT CALLBACK RECEIVED!");
+
+        const result = req.body.Result;
+        const resultType = result.ResultType;
+        const resultCode = result.ResultCode;
+        const resultDesc = result.ResultDesc;
+        const originatorConversationID = result.OriginatorConversationID;
+        const conversationID = result.ConversationID;
+        const transactionID = result.TransactionID;
+
+        const resultParameters = result.ResultParameters?.ResultParameter || [];
+
+        // Extract important fields
+        let transactionAmount = null;
+        let workingAccount = null;
+        let utilityAccount = null;
+        let transactionCompletedDateTime = null;
+        let receiverPartyPublicName = null;
+        let receiverPartyPhone = null;
+
+        resultParameters.forEach((item) => {
+            if (item.Key === "TransactionAmount") transactionAmount = item.Value;
+            if (item.Key === "WorkingAccountAvailableFunds")
+                workingAccount = item.Value;
+            if (item.Key === "UtilityAccountAvailableFunds")
+                utilityAccount = item.Value;
+            if (item.Key === "TransactionCompletedDateTime")
+                transactionCompletedDateTime = item.Value;
+            if (item.Key === "ReceiverPartyPublicName")
+                receiverPartyPublicName = item.Value;
+            if (item.Key === "ReceiverPartyPhone")
+                receiverPartyPhone = item.Value;
+        });
+
+        // Log everything
+        console.log("ResultType:", resultType);
+        console.log("ResultCode:", resultCode);
+        console.log("ResultDesc:", resultDesc);
+        console.log("OriginatorConversationID:", originatorConversationID);
+        console.log("ConversationID:", conversationID);
+        console.log("TransactionID:", transactionID);
+        console.log("TransactionAmount:", transactionAmount);
+        console.log("TransactionCompletedDateTime:", transactionCompletedDateTime);
+        console.log("ReceiverPartyPublicName:", receiverPartyPublicName);
+        console.log("ReceiverPartyPhone:", receiverPartyPhone);
+
+        // Save to Firestore
+        await db.collection("b2c_results").doc(conversationID).set({
+            resultType,
+            resultCode,
+            resultDesc,
+            originatorConversationID,
+            conversationID,
+            transactionID,
+            transactionAmount,
+            transactionCompletedDateTime,
+            receiverPartyPublicName,
+            receiverPartyPhone,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        console.log("✅ B2C RESULT CALLBACK STORED IN FIRESTORE");
+
+        res.status(200).json({ status: "B2C callback received" });
+    } catch (error) {
+        console.error("❌ Error handling B2C callback:", error);
+        res.status(500).json({ error: error.toString() });
+    }
+});
+
+
 
 
 
